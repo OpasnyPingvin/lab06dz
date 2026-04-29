@@ -12,11 +12,8 @@ add_subdirectory(solver_application)
 set(CPACK_PACKAGE_NAME "solver")
 set(CPACK_PACKAGE_VERSION "1.0.0")
 set(CPACK_PACKAGE_DESCRIPTION "Quadratic equation solver")
-set(CPACK_PACKAGE_VENDOR "Formatter Inc.")
-set(CPACK_PACKAGE_CONTACT "your-email@example.com")
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Your Name <your-email@example.com>")
 
-install(TARGETS solver_application/solver
-    RUNTIME DESTINATION bin
-)
+install(TARGETS solver RUNTIME DESTINATION bin)
 
 include(CPack)

@@ -7,6 +7,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(solver equation.cpp)
 
 target_link_libraries(solver PRIVATE
-	formatter_ex
-	solver_lib
+    formatter_ex
+    solver_lib
 )
+
+
+
+
+
+
+
