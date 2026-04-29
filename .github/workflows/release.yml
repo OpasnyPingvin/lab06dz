@@ -1,46 +1,122 @@
-name: Create Release Package
+name: Create Release Packages
 
 on:
   push:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
-  build-deb-package:
-    name: Build DEB package for Ubuntu
+  # 1. DEB для Ubuntu
+  build-deb:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Get version from tag
-        id: get_version
+      - uses: actions/checkout@v4
+      - name: Get version
+        id: ver
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Configure CMake
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
-
-      - name: Build solver
-        run: cmake --build build --target solver -j $(nproc)
-
-      - name: Create DEB package
+      - name: Build and package
         run: |
-          cd build
-          cpack -G DEB
-          cd ..
-          cp build/*.deb solver-${{ steps.get_version.outputs.VERSION }}-Ubuntu.deb
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target solver
+          cd build && cpack -G DEB
+          cp *.deb ../solver-${{ steps.ver.outputs.VERSION }}-Linux.deb
+      - name: Upload DEB
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-package
+          path: solver-*.deb
 
-      - name: Create Release on GitHub
+  # 2. RPM для Fedora
+  build-rpm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get version
+        id: ver
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Install rpm
+        run: sudo apt-get install -y rpm
+      - name: Build and package
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target solver
+          cd build && cpack -G RPM
+          cp *.rpm ../solver-${{ steps.ver.outputs.VERSION }}-Linux.rpm
+      - name: Upload RPM
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpm-package
+          path: solver-*.rpm
+
+  # 3. MSI для Windows
+  build-msi:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get version
+        id: ver
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Build and package
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --config Release
+          cd build
+          cpack -G WIX
+          copy *.msi solver-${{ steps.ver.outputs.VERSION }}-Windows.msi
+      - name: Upload MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: msi-package
+          path: solver-*.msi
+
+  # 4. DMG для macOS
+  build-dmg:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Get version
+        id: ver
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: Build and package
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build --target solver
+          cd build && cpack -G DragNDrop
+          cp *.dmg ../solver-${{ steps.ver.outputs.VERSION }}-macOS.dmg
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmg-package
+          path: solver-*.dmg
+
+  # 5. Создание релиза со всеми пакетами
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [build-deb, build-rpm, build-msi, build-dmg]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Get version
+        id: ver
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+      - name: List artifacts
+        run: ls -la artifacts/*/
+      - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          name: "Solver v${{ steps.get_version.outputs.VERSION }}"
+          name: "Solver v${{ steps.ver.outputs.VERSION }}"
           body: |
-            ## Solver ${{ steps.get_version.outputs.VERSION }}
+            ## Solver ${{ steps.ver.outputs.VERSION }}
             
             Решает квадратные уравнения.
             
-            ### Установка на Ubuntu
+            ### Установка
             
+            **Ubuntu/Debian:**
             ```bash
-            sudo dpkg -i solver-${{ steps.get_version.outputs.VERSION }}-Ubuntu.deb
+            sudo dpkg -i solver-${{ steps.ver.outputs.VERSION }}-Linux.deb
