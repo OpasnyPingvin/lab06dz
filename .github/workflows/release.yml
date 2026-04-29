@@ -1,0 +1,46 @@
+name: Create Release Package
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-deb-package:
+    name: Build DEB package for Ubuntu
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Configure CMake
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build solver
+        run: cmake --build build --target solver -j $(nproc)
+
+      - name: Create DEB package
+        run: |
+          cd build
+          cpack -G DEB
+          cd ..
+          cp build/*.deb solver-${{ steps.get_version.outputs.VERSION }}-Ubuntu.deb
+
+      - name: Create Release on GitHub
+        uses: softprops/action-gh-release@v1
+        with:
+          name: "Solver v${{ steps.get_version.outputs.VERSION }}"
+          body: |
+            ## Solver ${{ steps.get_version.outputs.VERSION }}
+            
+            Решает квадратные уравнения.
+            
+            ### Установка на Ubuntu
+            
+            ```bash
+            sudo dpkg -i solver-${{ steps.get_version.outputs.VERSION }}-Ubuntu.deb
